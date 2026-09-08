@@ -12,6 +12,23 @@ dist
 dist-ssr
 *.local
 
+# Secrets
+.env
+.env.local
+.env.*.local
+credentials
+secrets
+*.key
+*.pem
+
+# Tauri / installer build artifacts
+src-tauri/target/
+src-tauri/gen/schemas/
+*.msi
+*.msix
+*.appx
+*-setup.exe
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

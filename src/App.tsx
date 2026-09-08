@@ -1,5 +1,24 @@
 import { useState } from 'react'
+import { useOllama } from './hooks/useOllama'
+import { useAIProviders } from './hooks/useAIProviders'
+import { ChatWindow } from './components/chat/ChatWindow'
+import { AIProviders } from './components/settings/AIProviders'
 import './App.css'
+
+function formatBytes(bytes?: number): string {
+  if (!bytes) return 'Unknown size'
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let value = bytes
+  let index = 0
+
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024
+    index += 1
+  }
+
+  return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`
+}
 
 type Section =
   | 'Overview'
@@ -36,6 +55,23 @@ const agents = [
 function App() {
   const [active, setActive] = useState<Section>('Overview')
   const [message, setMessage] = useState('')
+
+  const {
+    status: ollamaStatus,
+    models: ollamaModels,
+    loading: ollamaLoading,
+    refresh: refreshOllama,
+  } = useOllama()
+
+  const {
+    providers,
+    geminiModels,
+    geminiModelsLoading,
+    refreshGeminiModels,
+  } = useAIProviders()
+
+  const geminiConfigured =
+    providers.find((p) => p.id === 'gemini')?.apiKeyConfigured === true
 
   const isOverview = active === 'Overview'
 
@@ -89,7 +125,6 @@ function App() {
             <div className="avatar">R</div>
           </div>
         </header>
-
         <div className="content">
           {isOverview ? (
             <>
@@ -113,16 +148,36 @@ function App() {
                     <span className="eyebrow">INFRASTRUCTURE</span>
                     <h2>Local AI Status</h2>
                   </div>
-                  <span className="live-badge">
-                    <span className="status-dot" />
-                    LIVE
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span className="live-badge">
+                      <span className="status-dot" />
+                      LIVE
+                    </span>
+                    <button
+                      className="ghost-button"
+                      onClick={() => void refreshOllama()}
+                      disabled={ollamaLoading}
+                    >
+                      Refresh
+                    </button>
+                  </div>
                 </div>
 
                 <div className="status-grid">
-                  <StatusCard title="Qwen3-0.6B" value="READY" detail="Local model" />
+                  <StatusCard
+                    title="Ollama"
+                    dotClassName={ollamaLoading ? '' : (ollamaStatus.connected ? 'online' : 'offline')}
+                    value={ollamaLoading ? 'CHECKING' : (ollamaStatus.connected ? 'RUNNING' : 'OFFLINE')}
+                    detail={ollamaLoading
+                      ? 'Checking local service...'
+                      : ollamaStatus.connected
+                        ? (ollamaStatus.version
+                          ? `v${ollamaStatus.version} · ${ollamaModels.length} models available`
+                          : `${ollamaModels.length} models available`)
+                        : (ollamaStatus.error || 'Unable to connect to local Ollama')}
+                  />
                   <StatusCard title="llama.cpp" value="RUNNING" detail="127.0.0.1:8080" />
-                  <StatusCard title="Repository" value="CONNECTED" detail="D:\\GitHub Repos" />
+                  <StatusCard title="Repository" value="CONNECTED" detail="D:\GitHub Repos" />
                   <StatusCard title="Agent Engine" value="READY" detail="Local orchestration" />
                 </div>
               </section>
@@ -203,6 +258,129 @@ function App() {
                 </div>
               </section>
             </>
+          ) : active === 'AI Chat' ? (
+            <ChatWindow />
+          ) : active === 'Models' ? (
+            <div className="model-arena">
+            <section className="section">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">LOCAL AI</span>
+                  <h2>Models</h2>
+                </div>
+                <button
+                  className="ghost-button"
+                  onClick={() => void refreshOllama()}
+                  disabled={ollamaLoading}
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {ollamaLoading ? (
+                <div className="empty-state">Loading local models...</div>
+              ) : !ollamaStatus.connected ? (
+                <div className="empty-state">
+                  <strong>Connect Ollama to discover local models.</strong>
+                  {ollamaStatus.error && (
+                    <small className="error-state">{ollamaStatus.error}</small>
+                  )}
+                </div>
+              ) : ollamaModels.length === 0 ? (
+                <div className="empty-state">No local models found.</div>
+              ) : (
+                <>
+                  <div className="model-summary">
+                    <span>Discovered models</span>
+                    <strong>{ollamaModels.length} models available</strong>
+                  </div>
+                  <div className="model-list">
+                    {ollamaModels.map((model) => (
+                      <div className="model-row" key={model.name}>
+                        <div>
+                          <strong>{model.name}</strong>
+                          {(model.details?.parameterSize || model.details?.quantizationLevel) && (
+                            <span className="model-detail">
+                              {model.details?.parameterSize}
+                              {model.details?.quantizationLevel
+                                ? ` · ${model.details.quantizationLevel}`
+                                : ''}
+                            </span>
+                          )}
+                        </div>
+                        <span className="model-meta">{formatBytes(model.size)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </section>
+
+              <section className="section">
+                <div className="section-heading">
+                  <div>
+                    <span className="eyebrow">CLOUD</span>
+                    <h2>Google Gemini</h2>
+                  </div>
+                  <button
+                    className="ghost-button"
+                    onClick={() => void refreshGeminiModels()}
+                    disabled={geminiModelsLoading}
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                {!geminiConfigured ? (
+                  <div className="empty-state">
+                    <strong>No Gemini API key configured.</strong>
+                    <small>
+                      Add a Gemini API key in Settings → AI Providers to
+                      discover cloud models.
+                    </small>
+                  </div>
+                ) : geminiModelsLoading ? (
+                  <div className="empty-state">Loading Gemini models...</div>
+                ) : geminiModels.length === 0 ? (
+                  <div className="empty-state">
+                    <strong>No Gemini models found.</strong>
+                    <small>
+                      Check the API key and network connection, then refresh.
+                    </small>
+                  </div>
+                ) : (
+                  <>
+                    <div className="model-summary">
+                      <span>Discovered models</span>
+                      <strong>{geminiModels.length} models available</strong>
+                    </div>
+                    <div className="model-list">
+                      {geminiModels.map((model) => (
+                        <div className="model-row" key={model.name}>
+                          <div>
+                            <strong>{model.name}</strong>
+                            {model.displayName &&
+                              model.displayName !== model.name && (
+                                <span className="model-detail">
+                                  {model.displayName}
+                                </span>
+                              )}
+                            {model.description && (
+                              <span className="model-detail model-desc">
+                                {model.description}
+                              </span>
+                            )}
+                          </div>
+                          <span className="model-meta">CLOUD</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </section>
+            </div>
+          ) : active === 'Settings' ? (
+            <AIProviders />
           ) : (
             <section className="placeholder-page">
               <div className="placeholder-icon">
@@ -234,16 +412,18 @@ function StatusCard({
   title,
   value,
   detail,
+  dotClassName,
 }: {
   title: string
   value: string
   detail: string
+  dotClassName?: string
 }) {
   return (
     <div className="status-card">
       <div className="card-label">{title}</div>
       <div className="card-value">
-        <span className="status-dot" />
+        <span className={`status-dot ${dotClassName ?? ''}`} />
         {value}
       </div>
       <div className="card-detail">{detail}</div>
