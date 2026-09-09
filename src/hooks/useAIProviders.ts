@@ -29,7 +29,7 @@ import {
 
 const SETTINGS_KEY = 'jarvex-ai-settings';
 
-interface UseAIProvidersResult {
+export interface UseAIProvidersResult {
   providers: AIProviderConfig[];
   settings: AISettings;
   loading: boolean;

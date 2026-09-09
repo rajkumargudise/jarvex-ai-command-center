@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AIModel, OllamaStatus } from "../types/ai";
 import { checkOllama } from "../services/ollama";
 
-interface UseOllamaResult {
+export interface UseOllamaResult {
   status: OllamaStatus;
   models: AIModel[];
   loading: boolean;

@@ -1,5 +1,5 @@
-import { useAIProviders } from '../../hooks/useAIProviders';
-import { useOllama } from '../../hooks/useOllama';
+import { useAIState } from '../../context/AIProvidersContext';
+import type { AIProviderConfig, AIModel } from '../../types/ai';
 import {
   credentialStoreBackend,
   getCredentialStoreLabel,
@@ -8,6 +8,7 @@ import { ProviderCard } from './ProviderCard';
 import { ProviderStatus } from './ProviderStatus';
 
 export function AIProviders() {
+  const { ollama, providers: providersState } = useAIState();
   const {
     providers,
     settings,
@@ -21,16 +22,16 @@ export function AIProviders() {
     refreshStatus,
     geminiModels,
     nvidiaModels,
-  } = useAIProviders();
+  } = providersState;
 
   const {
     status: ollamaStatus,
     models: ollamaModels,
-  } = useOllama();
+  } = ollama;
 
   const enabledProviderIds = providers
-    .filter((p) => p.enabled)
-    .map((p) => p.id);
+    .filter((p: AIProviderConfig) => p.enabled)
+    .map((p: AIProviderConfig) => p.id);
 
   const effectiveDefault =
     settings.defaultProvider === 'auto' ||
@@ -39,10 +40,10 @@ export function AIProviders() {
       : settings.defaultProvider;
 
   const effectiveModel =
-    ollamaModels.some((m) => m.name === settings.defaultModel)
+    ollamaModels.some((m: AIModel) => m.name === settings.defaultModel)
       ? settings.defaultModel
       : (ollamaModels.length > 0 ? ollamaModels[0].name : '');
-const effectiveProvider = providers.find((p) => p.id === effectiveDefault);
+const effectiveProvider = providers.find((p: AIProviderConfig) => p.id === effectiveDefault);
 
   return (
     <section className="settings-page">
@@ -78,8 +79,8 @@ const effectiveProvider = providers.find((p) => p.id === effectiveDefault);
             >
               <option value="auto">Auto</option>
               {providers
-                .filter((p) => p.enabled)
-                .map((p) => (
+                .filter((p: AIProviderConfig) => p.enabled)
+                .map((p: AIProviderConfig) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
@@ -113,7 +114,7 @@ const effectiveProvider = providers.find((p) => p.id === effectiveDefault);
                 value={effectiveModel}
                 onChange={(e) => setDefaultModel(e.target.value)}
               >
-                {ollamaModels.map((m) => (
+                {ollamaModels.map((m: AIModel) => (
                   <option key={m.name} value={m.name}>
                     {m.name}
                   </option>
@@ -133,7 +134,7 @@ const effectiveProvider = providers.find((p) => p.id === effectiveDefault);
       </div>
 
       <div className="provider-list">
-        {providers.map((provider) => (
+        {providers.map((provider: AIProviderConfig) => (
           <ProviderCard
             key={provider.id}
             provider={provider}

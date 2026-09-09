@@ -140,7 +140,11 @@ async function readNvidiaError(
  * Health check
  * ------------------------------------------------------------------------ */
 
-export type NvidiaHealthStatus = 'available' | 'error' | 'unavailable';
+export type NvidiaHealthStatus =
+  | 'available'
+  | 'error'
+  | 'unavailable'
+  | 'not_configured';
 
 export interface NvidiaHealthResult {
   status: NvidiaHealthStatus;
@@ -150,8 +154,13 @@ export interface NvidiaHealthResult {
 export async function checkNvidiaHealth(): Promise<NvidiaHealthResult> {
   const apiKey = await getStoredNvidiaKey();
 
+  // Health should reflect service + credential state, not the chat hooks'
+  // private copies. Without a key the provider is simply not configured.
   if (!apiKey) {
-    return { status: 'error', message: 'NVIDIA API key is not configured.' };
+    return {
+      status: 'not_configured',
+      message: 'NVIDIA API key is not configured.',
+    };
   }
 
   try {
@@ -266,46 +275,6 @@ export async function getNvidiaModels(): Promise<AIModel[]> {
 
   nvidiaModelCache = { timestamp: Date.now(), models };
   return models;
-}
-
-/**
- * FALLBACK catalog: used ONLY when live discovery is unavailable (no key,
- * network failure, API error). Static, version-stable chat models from the
- * public NVIDIA API catalog. Discovery results always take precedence, and
- * no single model is special-cased.
- */
-const NVIDIA_FALLBACK_MODELS: AIModel[] = [
-  'meta/llama-3.3-70b-instruct',
-  'meta/llama-3.1-405b-instruct',
-  'nvidia/llama-3.3-nemotron-super-49b-v1',
-  'deepseek-ai/deepseek-r1',
-  'qwen/qwen2.5-coder-32b-instruct',
-  'mistralai/mistral-small-24b-instruct',
-  'moonshotai/kimi-k2-instruct',
-].map((name) => ({
-  name,
-  providerId: 'nvidia',
-  description: 'Fallback catalog entry — refresh to re-run live discovery.',
-  capabilities: {
-    chat: true,
-    streaming: true,
-  },
-}));
-
-/**
- * Model list for the unified registry: live discovery first; the static
- * fallback catalog only when discovery fails or returns nothing usable.
- */
-export async function getNvidiaModelsWithFallback(): Promise<AIModel[]> {
-  try {
-    const models = await getNvidiaModels();
-    if (models.length > 0) {
-      return models;
-    }
-  } catch (err) {
-    console.error('[ai] NVIDIA model discovery failed, using fallback:', err);
-  }
-  return NVIDIA_FALLBACK_MODELS;
 }
 
 /* --------------------------------------------------------------------------

@@ -14,7 +14,7 @@ import {
 } from './gemini';
 import {
   checkNvidiaHealth,
-  getNvidiaModelsWithFallback,
+  getNvidiaModels,
   streamNvidiaChat,
 } from './nvidia';
 
@@ -102,7 +102,7 @@ export async function getProviderModels(
   }
 
   if (provider.id === 'nvidia') {
-    const models = await getNvidiaModelsWithFallback();
+    const models = await getNvidiaModels();
     return { provider, models };
   }
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AIModel, ChatMessage } from '../types/ai';
-import { useOllama } from './useOllama';
-import { useAIProviders } from './useAIProviders';
+import type { UseOllamaResult } from './useOllama';
+import type { UseAIProvidersResult } from './useAIProviders';
 import {
   aiProviders,
   resolveAIProvider,
@@ -14,13 +14,23 @@ function generateId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-export function useChat() {
+export interface UseChatState {
+  ollama: UseOllamaResult;
+  providersState: UseAIProvidersResult;
+}
+
+/**
+ * Chat state. Takes the shared AI state ({ ollama, providersState }) as an
+ * argument so Chat always reads the same live provider state as Settings and
+ * the Models page — never a private hook copy.
+ */
+export function useChat({ ollama, providersState }: UseChatState) {
   const {
     status: ollamaStatus,
     models: ollamaModels,
     loading: ollamaLoading,
     refresh: refreshOllama,
-  } = useOllama();
+  } = ollama;
 
   const {
     providers,
@@ -31,7 +41,7 @@ export function useChat() {
     nvidiaModels,
     nvidiaModelsLoading,
     refreshNvidiaModels,
-  } = useAIProviders();
+  } = providersState;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -183,18 +193,27 @@ export function useChat() {
       return !ollamaStatus.connected && !ollamaLoading;
     }
     if (providerId === 'gemini') {
+      // Mirror the NVIDIA behaviour: surface key/API errors as send-time
+      // errors rather than locking the chat input.
+      if (geminiConfig?.status === 'error') {
+        return false;
+      }
       return (
         !geminiModelsLoading &&
         (geminiConfig?.status === 'unavailable' ||
-          geminiConfig?.status === 'error' ||
           !geminiConfig?.apiKeyConfigured)
       );
     }
     if (providerId === 'nvidia') {
+      // A service-level error (bad key, API denial) is shown by the send
+      // path and must not lock the input. Offline applies to timeouts,
+      // network failures, and any definitely-missing credential.
+      if (nvidiaConfig?.status === 'error') {
+        return false;
+      }
       return (
         !nvidiaModelsLoading &&
         (nvidiaConfig?.status === 'unavailable' ||
-          nvidiaConfig?.status === 'error' ||
           !nvidiaConfig?.apiKeyConfigured)
       );
     }

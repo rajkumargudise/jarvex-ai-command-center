@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useAIState } from '../../context/AIProvidersContext';
 import { useChat } from '../../hooks/useChat';
 import { ProviderSelector } from './ProviderSelector';
 import { ModelSelector } from './ModelSelector';
@@ -6,6 +7,7 @@ import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 
 export function ChatWindow() {
+  const { ollama, providers: providersState } = useAIState();
   const {
     messages,
     isGenerating,
@@ -24,7 +26,7 @@ export function ChatWindow() {
     stopGeneration,
     clearChat,
     refreshProviderModels,
-  } = useChat();
+  } = useChat({ ollama, providersState });
 
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -131,10 +133,14 @@ export function ChatWindow() {
               ? 'Gemini is unavailable'
               : providerId === 'nvidia'
                 ? 'NVIDIA NIM is unavailable'
-                : 'Ollama is offline'}
+                : providerId === 'auto'
+                  ? 'No AI provider is available'
+                  : 'Ollama is offline'}
           </strong>
           <p>
-            {providerId === 'gemini' || providerId === 'nvidia'
+            {providerId === 'gemini' ||
+            providerId === 'nvidia' ||
+            providerId === 'auto'
               ? 'Check the API key and network connection in Settings → AI Providers.'
               : 'Start Ollama on this computer to use local AI.'}
           </p>
